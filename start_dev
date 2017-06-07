@@ -1,0 +1,39 @@
+#!/bin/bash
+ # the preceding echo prevents hanging forever at the login prompt in case user is not logged in to heroku
+HEROKU_CONFIG=`echo "" | heroku config --app tranzact3-core`
+if echo "$HEROKU_CONFIG" | grep "Enter your Heroku credentials" > /dev/null; then
+  echo -e "\nAttempting to log in to Heroku with SSO\n"
+  export HEROKU_ORGANIZATION=zayo
+  heroku login --sso
+  echo "Getting config variables from tranzact3-core app on Heroku"
+  HEROKU_CONFIG=`echo "" | heroku config --app tranzact3-core`
+fi
+if echo "$HEROKU_CONFIG" | grep "Enter your Heroku credentials" > /dev/null; then
+  echo -e "\nError: Logging in with SSO failed, cannot get heroku config variables"
+  echo -e "Try fixing with 'heroku login --sso' and please alert the team of the error so we can address it.\n"
+  echo -e "For debugging, the cli output was: $HEROKU_CONFIG"
+else
+# get environment variables from heroku config, and set locally for use in node
+  while read entry; do
+
+      if [[ $entry != *":"* ]]
+      then
+          continue
+      fi
+
+      envKey=`echo $entry | awk '{print substr($1,1,length($1)-1)}'`
+      envValue=`echo $entry | awk '{print $2}'`
+
+      export $envKey=$envValue
+      # echo "---> $envKey=$envValue"
+
+  done < <(heroku config --app tranzact3-core)
+
+  export LOCALHOST=1; # need to know when running locally to disable ssl
+  export DOMAIN_NAME=http://localhost:3000
+  export NODE_ENV=development
+    
+  # run server with nodemon and client with webpack-dev-server
+  node ./start_dev.js
+
+fi
